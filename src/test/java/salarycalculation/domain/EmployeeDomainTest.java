@@ -1,7 +1,7 @@
 package salarycalculation.domain;
 
 import static org.hamcrest.core.Is.is;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertThat;
 
 import java.sql.Date;
 import java.util.Calendar;
@@ -10,6 +10,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.experimental.runners.Enclosed;
 import org.junit.runner.RunWith;
+import org.mockito.internal.util.reflection.Whitebox;
 
 import salarycalculation.entity.Capability;
 import salarycalculation.entity.Employee;
@@ -49,7 +50,7 @@ public class EmployeeDomainTest {
         @Test
         public void PL_の場合_諸手当を_13000_取得できること() {
             setUpNowCalendar(2017, 3, 31);
-            testee.getEntity().setCapabilityRank("PL");
+            setUpCapabilityRank(CapabilityRank.PL);
 
             // 諸手当
             assertThat(testee.getAllowance(), is(10000 + 3000));
@@ -58,7 +59,7 @@ public class EmployeeDomainTest {
         @Test
         public void PM_の場合_諸手当を_33000_取得できること() {
             setUpNowCalendar(2017, 3, 31);
-            testee.getEntity().setCapabilityRank("PM");
+            setUpCapabilityRank(CapabilityRank.PM);
 
             // 諸手当
             assertThat(testee.getAllowance(), is(30000 + 3000));
@@ -78,7 +79,7 @@ public class EmployeeDomainTest {
         @Test
         public void PL_の場合_諸手当を_15000_取得できること() {
             setUpNowCalendar(2019, 3, 31);
-            testee.getEntity().setCapabilityRank("PL");
+            setUpCapabilityRank(CapabilityRank.PL);
 
             // 諸手当
             assertThat(testee.getAllowance(), is(10000 + 5000));
@@ -87,7 +88,7 @@ public class EmployeeDomainTest {
         @Test
         public void PM_の場合_諸手当を_35000_取得できること() {
             setUpNowCalendar(2019, 3, 31);
-            testee.getEntity().setCapabilityRank("PM");
+            setUpCapabilityRank(CapabilityRank.PM);
 
             // 諸手当
             assertThat(testee.getAllowance(), is(30000 + 5000));
@@ -107,7 +108,7 @@ public class EmployeeDomainTest {
         @Test
         public void PL_の場合_諸手当を_20000_取得できること() {
             setUpNowCalendar(2024, 3, 31);
-            testee.getEntity().setCapabilityRank("PL");
+            setUpCapabilityRank(CapabilityRank.PL);
 
             // 諸手当
             assertThat(testee.getAllowance(), is(10000 + 10000));
@@ -116,7 +117,7 @@ public class EmployeeDomainTest {
         @Test
         public void PM_の場合_諸手当を_40000_取得できること() {
             setUpNowCalendar(2024, 3, 31);
-            testee.getEntity().setCapabilityRank("PM");
+            setUpCapabilityRank(CapabilityRank.PM);
 
             // 諸手当
             assertThat(testee.getAllowance(), is(30000 + 10000));
@@ -136,7 +137,7 @@ public class EmployeeDomainTest {
         @Test
         public void PL_の場合_諸手当を_30000_取得できること() {
             setUpNowCalendar(2034, 3, 31);
-            testee.getEntity().setCapabilityRank("PL");
+            setUpCapabilityRank(CapabilityRank.PL);
 
             // 諸手当
             assertThat(testee.getAllowance(), is(10000 + 20000));
@@ -145,7 +146,7 @@ public class EmployeeDomainTest {
         @Test
         public void PM_の場合_諸手当を_50000_取得できること() {
             setUpNowCalendar(2034, 3, 31);
-            testee.getEntity().setCapabilityRank("PM");
+            setUpCapabilityRank(CapabilityRank.PM);
 
             // 諸手当
             assertThat(testee.getAllowance(), is(30000 + 20000));
@@ -161,7 +162,7 @@ public class EmployeeDomainTest {
         @Override
         public void setUp() {
             super.setUp();
-            testee.getEntity().setCapabilityRank("PL");
+            setUpCapabilityRank(CapabilityRank.PL);
         }
 
         @Test
@@ -184,7 +185,7 @@ public class EmployeeDomainTest {
         @Override
         public void setUp() {
             super.setUp();
-            testee.getEntity().setCapabilityRank("PM");
+            setUpCapabilityRank(CapabilityRank.PM);
         }
 
         @Test
@@ -241,7 +242,7 @@ public class EmployeeDomainTest {
          * @param month 月
          * @param day 日
          */
-        public void setUpNowCalendar(int year, int month, int day) {
+        protected void setUpNowCalendar(int year, int month, int day) {
             // 現在日
             BusinessDateDomain businessDate = new BusinessDateDomain();
             Calendar now = Calendar.getInstance();
@@ -249,6 +250,15 @@ public class EmployeeDomainTest {
             businessDate.setCalendar(now);
 
             testee.setBusinessDateDomain(businessDate);
+        }
+
+        /**
+         * 能力等級を表す{@link CapabilityRank}を設定する。
+         *
+         * @param target {@link CapabilityRank}
+         */
+        protected void setUpCapabilityRank(CapabilityRank target) {
+            Whitebox.setInternalState(testee, "capabilityRank", target);
         }
     }
 

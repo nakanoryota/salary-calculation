@@ -76,19 +76,19 @@ public class EmployeeRepositoryTest {
 
     @Test
     public void 指定年月の全社員の給与総支給額を取得できること() {
-        assertThat(testee.getSumTotalSalary(201504), is(1965412));
+        assertThat(testee.sumTotalSalaries(201504), is(1965412));
     }
 
     @Test
     public void 指定年月の全社員の手取り額平均を取得できること() {
-        assertThat(testee.getAverageTakeHome(201504), is(458387));
+        assertThat(testee.averageTakeHome(201504), is(458387));
     }
 
     @Test
     public void 指定した額を超える想定年収の社員数を取得できること() {
-        assertThat(testee.getCountByOverAnnualSalary(4000000), is(3));
+        assertThat(testee.countByOverAnnualSalary(4000000), is(3));
 
-        assertThat(testee.getCountByOverAnnualSalary(5000000), is(2));
+        assertThat(testee.countByOverAnnualSalary(5000000), is(2));
     }
 
     @Test
@@ -118,7 +118,7 @@ public class EmployeeRepositoryTest {
         String expectedOrganizationName;
 
         public Fixture(String no, int expectedNo, String expectedName, String expectedRoleRank,
-                String expectedCapabilityRank, String expectedOrganizationName) {
+                       String expectedCapabilityRank, String expectedOrganizationName) {
             this.no = no;
             this.expectedNo = expectedNo;
             this.expectedName = expectedName;

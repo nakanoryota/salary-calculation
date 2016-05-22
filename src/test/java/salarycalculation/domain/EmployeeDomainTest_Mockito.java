@@ -1,7 +1,7 @@
 package salarycalculation.domain;
 
 import static org.hamcrest.core.Is.is;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -14,7 +14,6 @@ import java.math.BigDecimal;
 import org.junit.Before;
 import org.junit.Test;
 
-import salarycalculation.database.WorkDao;
 import salarycalculation.entity.Capability;
 import salarycalculation.entity.Employee;
 import salarycalculation.entity.Role;
@@ -129,11 +128,12 @@ public class EmployeeDomainTest_Mockito {
         work.setLateNightOverTime(BigDecimal.valueOf(20L));
         work.setHolidayWorkTime(BigDecimal.valueOf(30L));
         work.setHolidayLateNightOverTime(BigDecimal.valueOf(40L));
+        WorkDomain workDomain = new WorkDomain(work);
 
         // WorkDao の振る舞いを定義
-        WorkDao mockWorkDao = mock(WorkDao.class);
-        when(mockWorkDao.getByYearMonth(101, 201504)).thenReturn(work);
-        testee.setWorkDao(mockWorkDao);
+        WorkRepository mockWorkRepository = mock(WorkRepository.class);
+        when(mockWorkRepository.getByYearMonth(101, 201504)).thenReturn(workDomain);
+        testee.setWorkRepository(mockWorkRepository);
 
         // 期待値を求める
         int expected = (10) * 10;
@@ -145,7 +145,7 @@ public class EmployeeDomainTest_Mockito {
         assertThat(testee.getOvertimeAmount(201504), is(expected));
 
         // 検証
-        verify(mockWorkDao).getByYearMonth(101, 201504);
+        verify(mockWorkRepository).getByYearMonth(101, 201504);
     }
 
     private void setUpSpy() {

@@ -1,9 +1,14 @@
 package salarycalculation.domain;
 
-import java.util.ArrayList;
+import static salarycalculation.domain.EmployeeComparators.ANNUAL_TOTAL_SALARY_PLAN_ASC;
+import static salarycalculation.domain.EmployeeComparators.ANNUAL_TOTAL_SALARY_PLAN_DESC;
+import static salarycalculation.domain.EmployeeComparators.DURATION_MONTH_ASC;
+import static salarycalculation.domain.EmployeeComparators.DURATION_MONTH_DESC;
+
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 import salarycalculation.database.CapabilityDao;
 import salarycalculation.database.EmployeeDao;
@@ -43,18 +48,8 @@ public class EmployeeRepository {
     public EmployeeDomain get(String no) {
         Employee employee = dao.get(no);
 
-        // 所属する組織情報を取得
-        Organization organization = organizationDao.get(employee.getOrganization());
-
-        // 各等級情報を取得
-        Role role = roleDao.get(employee.getRoleRank());
-        Capability capability = capabilityDao.get(employee.getCapabilityRank());
-
         // Domain を準備
-        EmployeeDomain domain = new EmployeeDomain(employee);
-        domain.setOrganization(organization);
-        domain.setRole(role);
-        domain.setCapability(capability);
+        EmployeeDomain domain = buildDomainHasRelation(employee);
 
         return domain;
     }
@@ -87,28 +82,7 @@ public class EmployeeRepository {
     // @UT
     public List<EmployeeDomain> findAll() {
         List<Employee> employees = dao.findAll(true);
-
-        // Domain 一覧を準備
-        List<EmployeeDomain> domains = new ArrayList<>(employees.size());
-        for (Employee employee : employees) {
-
-            // 所属する組織情報を取得
-            Organization organization = organizationDao.get(employee.getOrganization());
-
-            // 各等級情報を取得
-            Role role = roleDao.get(employee.getRoleRank());
-            Capability capability = capabilityDao.get(employee.getCapabilityRank());
-
-            // Domain を準備
-            EmployeeDomain domain = new EmployeeDomain(employee);
-            domain.setOrganization(organization);
-            domain.setRole(role);
-            domain.setCapability(capability);
-
-            domains.add(domain);
-        }
-
-        return domains;
+        return employees.stream().map(t -> buildDomainHasRelation(t)).collect(Collectors.toList());
     }
 
     /**
@@ -119,42 +93,30 @@ public class EmployeeRepository {
      */
     // @UT
     public List<EmployeeDomain> findAllOrderByAnnualSalary(final boolean ascending) {
-        List<Employee> employees = dao.findAll(true);
-
-        // Domain 一覧を準備
-        List<EmployeeDomain> domains = new ArrayList<>(employees.size());
-        for (Employee employee : employees) {
-
-            // 所属する組織情報を取得
-            Organization organization = organizationDao.get(employee.getOrganization());
-
-            // 各等級情報を取得
-            Role role = roleDao.get(employee.getRoleRank());
-            Capability capability = capabilityDao.get(employee.getCapabilityRank());
-
-            // Domain を準備
-            EmployeeDomain domain = new EmployeeDomain(employee);
-            domain.setOrganization(organization);
-            domain.setRole(role);
-            domain.setCapability(capability);
-
-            domains.add(domain);
-        }
+        List<EmployeeDomain> domains = findAll();
 
         // 並び替え
-        Collections.sort(domains, new Comparator<EmployeeDomain>() {
-
-            @Override
-            public int compare(EmployeeDomain o1, EmployeeDomain o2) {
-                if (ascending) {
-                    return (o1.getAnnualTotalSalaryPlan() - o2.getAnnualTotalSalaryPlan());
-                } else {
-                    return (o2.getAnnualTotalSalaryPlan() - o1.getAnnualTotalSalaryPlan());
-                }
-            }
-        });
+        Collections.sort(domains, (ascending ? ANNUAL_TOTAL_SALARY_PLAN_ASC : ANNUAL_TOTAL_SALARY_PLAN_DESC));
 
         return domains;
+    }
+
+    private EmployeeDomain buildDomainHasRelation(Employee employee) {
+
+        // 所属する組織情報を取得
+        Organization organization = organizationDao.get(employee.getOrganization());
+
+        // 各等級情報を取得
+        Role role = roleDao.get(employee.getRoleRank());
+        Capability capability = capabilityDao.get(employee.getCapabilityRank());
+
+        // Domain を準備
+        EmployeeDomain domain = new EmployeeDomain(employee);
+        domain.setOrganization(organization);
+        domain.setRole(role);
+        domain.setCapability(capability);
+
+        return domain;
     }
 
     /**
@@ -164,15 +126,9 @@ public class EmployeeRepository {
      * @return 全社員の総支給額合計
      */
     // @UT
-    public int getSumTotalSalary(int yearMonth) {
+    public int sumTotalSalaries(int yearMonth) {
         List<EmployeeDomain> domains = findAll();
-
-        int total = 0;
-        for (EmployeeDomain domain : domains) {
-            total += domain.getTotalSalary(yearMonth);
-        }
-
-        return total;
+        return domains.stream().mapToInt(t -> t.getTotalSalary(yearMonth)).sum();
     }
 
     /**
@@ -182,16 +138,9 @@ public class EmployeeRepository {
      * @return 全社員の手取り額平均
      */
     // @UT
-    public int getAverageTakeHome(int yearMonth) {
+    public int averageTakeHome(int yearMonth) {
         List<EmployeeDomain> domains = findAll();
-
-        int total = 0;
-        for (EmployeeDomain domain : domains) {
-            total += domain.getTakeHomeAmount(yearMonth);
-        }
-        int average = total / domains.size();
-
-        return average;
+        return (int) domains.stream().mapToInt(t -> t.getTakeHomeAmount(yearMonth)).average().getAsDouble();
     }
 
     /**
@@ -201,51 +150,22 @@ public class EmployeeRepository {
      * @return 該当する社員数
      */
     // @UT
-    public int getCountByOverAnnualSalary(int condition) {
+    public int countByOverAnnualSalary(int condition) {
         List<EmployeeDomain> domains = findAll();
-
-        int count = 0;
-        for (EmployeeDomain domain : domains) {
-            if (domain.getAnnualTotalSalaryPlan() >= condition) {
-                count++;
-            }
-        }
-        return count;
+        return (int) domains.stream().filter(t -> t.overAnnualTotalSalaryPlan(condition)).count();
     }
 
     /**
      * 勤続月数の最大 or 最小の社員情報を取得する。
      *
      * @param selectMax 最大を求める場合は true
-     * @return 社員情報
+     * @return 社員情報。社員が一人も存在しない場合は null
      */
     // @UT
     public EmployeeDomain getByDurationMonth(boolean selectMax) {
         List<EmployeeDomain> domains = findAll();
-
-        EmployeeDomain result = null;
-        int condition;
-        if (selectMax) {
-            condition = 0;
-        } else {
-            condition = Integer.MAX_VALUE;
-        }
-
-        for (EmployeeDomain domain : domains) {
-            if (selectMax) {
-                if (condition < domain.getDurationMonth()) {
-                    result = domain;
-                    condition = domain.getDurationMonth();
-                }
-            } else {
-                if (condition > domain.getDurationMonth()) {
-                    result = domain;
-                    condition = domain.getDurationMonth();
-                }
-            }
-        }
-
-        return result;
+        Optional<EmployeeDomain> result = domains.stream().max((selectMax ? DURATION_MONTH_ASC : DURATION_MONTH_DESC));
+        return (result.isPresent() ? result.get() : null);
     }
 
     /**

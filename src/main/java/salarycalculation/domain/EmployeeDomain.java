@@ -1,17 +1,16 @@
 package salarycalculation.domain;
 
-import java.math.BigDecimal;
+import static salarycalculation.domain.CapabilityRank.PL;
+import static salarycalculation.domain.CapabilityRank.PM;
+
 import java.util.Calendar;
 
-import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.time.DateUtils;
 
-import salarycalculation.database.WorkDao;
 import salarycalculation.entity.Capability;
 import salarycalculation.entity.Employee;
 import salarycalculation.entity.Organization;
 import salarycalculation.entity.Role;
-import salarycalculation.entity.Work;
 
 /**
  * 社員情報ドメイン。
@@ -29,15 +28,17 @@ public class EmployeeDomain {
     private Role role;
     /** 能力等級 */
     private Capability capability;
+    private CapabilityRank capabilityRank;
 
-    private WorkDao workDao;
+    private WorkRepository workRepository;
 
     /** 業務日付ドメイン */
     private BusinessDateDomain businessDateDomain;
 
     public EmployeeDomain(Employee entity) {
         this.entity = entity;
-        this.workDao = new WorkDao();
+        this.capabilityRank = CapabilityRank.codeOf(entity.getCapabilityRank());
+        this.workRepository = new WorkRepository();
         this.businessDateDomain = new BusinessDateDomain();
     }
 
@@ -110,12 +111,11 @@ public class EmployeeDomain {
      */
     // @UT
     public int getTakeHomeAmount(int workYearMonth) {
-        // 総支給額を求める
+        // 総支給額
         int totalSalary = getTotalSalary(workYearMonth);
 
-        // 控除額を求める
-        int deduction = entity.getHealthInsuranceAmount() + entity.getEmployeePensionAmount()
-                        + entity.getIncomeTaxAmount() + entity.getInhabitantTaxAmount();
+        // 控除額
+        int deduction = deduction();
 
         // 差引給与額を求める
         int takeHome = totalSalary - deduction;
@@ -134,11 +134,16 @@ public class EmployeeDomain {
      */
     // @UT
     public int getTotalSalary(int workYearMonth) {
-        int tmp = role.getAmount();
-        tmp += capability.getAmount();
-        tmp += getAllowance();
-        tmp += getOvertimeAmount(workYearMonth);
-        return tmp;
+        // 基準内給与
+        int standardSalary = standardSalary(getAllowance());
+
+        // 基準外給与
+        int nonStandardSalary = getOvertimeAmount(workYearMonth);
+
+        // 総支給額
+        int totalSalary = standardSalary + nonStandardSalary;
+
+        return totalSalary;
     }
 
     /**
@@ -151,36 +156,26 @@ public class EmployeeDomain {
         int allowance = entity.getCommuteAmount() + entity.getRentAmount();
 
         // 能力等級が 'PL' or 'PM' の場合、別途手当が出る
-        if (StringUtils.equals(entity.getCapabilityRank(), "PL")) {
-            allowance += 10000;
-        } else if (StringUtils.equals(entity.getCapabilityRank(), "PM")) {
-            allowance += 30000;
-        }
+        allowance += capabilityRank.getAllowance();
 
         // 勤続年数が丸 3年目、5年目、10年目, 20年目の場合、別途手当が出る
-        switch (getDurationYear()) {
-        case 3:
-            if ((getDurationMonth() % 12) == 0) {
+        if ((getDurationMonth() % 12) == 0) {
+            switch (getDurationYear()) {
+            case 3:
                 allowance += 3000;
-            }
-            break;
-        case 5:
-            if ((getDurationMonth() % 12) == 0) {
+                break;
+            case 5:
                 allowance += 5000;
-            }
-            break;
-        case 10:
-            if ((getDurationMonth() % 12) == 0) {
+                break;
+            case 10:
                 allowance += 10000;
-            }
-            break;
-        case 20:
-            if ((getDurationMonth() % 12) == 0) {
+                break;
+            case 20:
                 allowance += 20000;
+                break;
+            default:
+                break;
             }
-            break;
-        default:
-            break;
         }
 
         return allowance;
@@ -195,43 +190,15 @@ public class EmployeeDomain {
     // @UT
     public int getOvertimeAmount(int workYearMonth) {
 
-        int overtimeAmount = 0;
-
-        // 稼動情報を取得
-        Work work = workDao.getByYearMonth(entity.getNo(), workYearMonth);
-
-        // 時間外手当を求める
-        BigDecimal workOverTime1hAmount = BigDecimal.valueOf(entity.getWorkOverTime1hAmount());
-        BigDecimal amount = workOverTime1hAmount.multiply(work.getWorkOverTime());
-        int workOverTimeAllowance = amount.intValue();
-        overtimeAmount += workOverTimeAllowance;
-
-        // 深夜手当を求める
-        workOverTime1hAmount = BigDecimal.valueOf(entity.getWorkOverTime1hAmount() * 1.1);
-        amount = workOverTime1hAmount.multiply(work.getLateNightOverTime());
-        int lateNightOverTimeAllowance = amount.intValue();
-        overtimeAmount += lateNightOverTimeAllowance;
-
-        // 休日手当を求める
-        workOverTime1hAmount = BigDecimal.valueOf(entity.getWorkOverTime1hAmount() * 1.2);
-        amount = workOverTime1hAmount.multiply(work.getHolidayWorkTime());
-        int holidayWorkTimeAllowance = amount.intValue();
-        overtimeAmount += holidayWorkTimeAllowance;
-
-        // 休日深夜手当を求める
-        workOverTime1hAmount = BigDecimal.valueOf(entity.getWorkOverTime1hAmount() * 1.3);
-        amount = workOverTime1hAmount.multiply(work.getHolidayLateNightOverTime());
-        int holidayLateNightOverTimeAllowance = amount.intValue();
-        overtimeAmount += holidayLateNightOverTimeAllowance;
-
         // 能力等級が 'PL' or 'PM' の場合、残業代は出ない
-        if (StringUtils.equals(entity.getCapabilityRank(), "PL")) {
-            overtimeAmount = 0;
-        } else if (StringUtils.equals(entity.getCapabilityRank(), "PM")) {
-            overtimeAmount = 0;
+        if (capabilityRank == PL || capabilityRank == PM) {
+            return 0;
         }
 
-        return overtimeAmount;
+        // 稼動情報を取得
+        WorkDomain work = workRepository.getByYearMonth(entity.getNo(), workYearMonth);
+
+        return work.calcOvertimeAmount(entity.getWorkOverTime1hAmount());
     }
 
     /**
@@ -251,24 +218,36 @@ public class EmployeeDomain {
      */
     // @UT
     public int getAnnualTotalSalaryPlan() {
-        // 基本給を求める
-        int tmp = role.getAmount() + capability.getAmount();
+        // 基準内給与
+        int standardSalary = standardSalary(capabilityRank.getAllowance());
 
-        // 能力等級が 'PL' or 'PM' の場合、別途手当が出る
-        if (StringUtils.equals(entity.getCapabilityRank(), "PL")) {
-            tmp += 10000;
-        } else if (StringUtils.equals(entity.getCapabilityRank(), "PM")) {
-            tmp += 30000;
-        }
-
-        // 想定年収を求める
-        int annualTotalSalaryPlan = tmp * 12;
+        // 想定年収
+        int annualTotalSalaryPlan = (standardSalary) * 12;
 
         return annualTotalSalaryPlan;
     }
 
-    public void setWorkDao(WorkDao workDao) {
-        this.workDao = workDao;
+    /**
+     * 想定年収が指定額以上かどうかを判定する。
+     *
+     * @param condition 判定対象額
+     * @return 指定額以上の場合は true
+     */
+    public boolean overAnnualTotalSalaryPlan(int condition) {
+        return getAnnualTotalSalaryPlan() >= condition;
+    }
+
+    private int baseSalary() {
+        return role.getAmount() + capability.getAmount();
+    }
+
+    private int standardSalary(int allowance) {
+        return baseSalary() + allowance;
+    }
+
+    private int deduction() {
+        return entity.getHealthInsuranceAmount() + entity.getEmployeePensionAmount()
+               + entity.getIncomeTaxAmount() + entity.getInhabitantTaxAmount();
     }
 
     public Employee getEntity() {
@@ -301,6 +280,10 @@ public class EmployeeDomain {
 
     public void setCapability(Capability capability) {
         this.capability = capability;
+    }
+
+    public void setWorkRepository(WorkRepository workRepository) {
+        this.workRepository = workRepository;
     }
 
     public void setBusinessDateDomain(BusinessDateDomain businessDateDomain) {
