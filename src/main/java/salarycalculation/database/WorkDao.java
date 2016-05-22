@@ -1,33 +1,20 @@
 package salarycalculation.database;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-
-import org.apache.commons.dbutils.QueryRunner;
-import org.apache.commons.dbutils.ResultSetHandler;
 import org.apache.commons.dbutils.handlers.BeanHandler;
+import org.apache.commons.dbutils.handlers.BeanListHandler;
 
 import salarycalculation.entity.Work;
 import salarycalculation.exception.RecordNotFoundException;
-import salarycalculation.exception.RuntimeSQLException;
 
 /**
  * 稼動情報 Dao。
  *
  * @author naotake
  */
-public class WorkDao {
-
-    private Connection connection;
+public class WorkDao extends BaseDao<Work> {
 
     public WorkDao() {
-        String url = "jdbc:h2:./data/salary_calculation";
-        try {
-            this.connection = DriverManager.getConnection(url, "sa", "");
-        } catch (SQLException e) {
-            throw new RuntimeSQLException("Connection Failure", e);
-        }
+        super();
     }
 
     /**
@@ -39,25 +26,22 @@ public class WorkDao {
      */
     // @UT
     public Work getByYearMonth(int employeeNo, int workYearMonth) {
-        ResultSetHandler<Work> rsHandler = new BeanHandler<Work>(Work.class);
-        QueryRunner runner = new QueryRunner();
+        String query = "select * from work where employeeNo = ? and workYearMonth = ?";
 
-        Work result = null;
-        try {
-            result = runner.query(connection, "select * from work where employeeNo = " + employeeNo
-                    + " and workYearMonth = " + workYearMonth, rsHandler);
-        } catch (SQLException e) {
-            throw new RuntimeSQLException("Select Failure", e);
-        }
-
+        Work result = getByQuery(query, employeeNo, workYearMonth);
         if (result == null) {
             throw new RecordNotFoundException(Work.class, employeeNo, workYearMonth);
         }
-
         return result;
     }
 
-    public void setConnection(Connection connection) {
-        this.connection = connection;
+    @Override
+    protected BeanHandler<Work> newBeanHandler() {
+        return new BeanHandler<Work>(Work.class);
+    }
+
+    @Override
+    protected BeanListHandler<Work> newBeanListHandler() {
+        return new BeanListHandler<Work>(Work.class);
     }
 }
